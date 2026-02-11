@@ -1,0 +1,29 @@
+{
+  "name": "@claw-dev/log-analyzer",
+  "version": "1.0.0",
+  "description": "日志分析工具 - 快速分析日志文件，提取关键信息",
+  "main": "src/index.js",
+  "bin": {
+    "log-analyzer": "./bin/cli.js"
+  },
+  "scripts": {
+    "test": "node src/index.js analyze"
+  },
+  "keywords": [
+    "log",
+    "analyzer",
+    "monitoring",
+    "debugging",
+    "devops"
+  ],
+  "author": "梦心",
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^12.1.0",
+    "chalk": "^4.1.2",
+    "moment": "^2.30.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
