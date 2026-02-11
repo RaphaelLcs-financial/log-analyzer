@@ -13,6 +13,9 @@
 - **导出结果**：导出为 JSON 或 CSV 格式
 - **时间范围**：自动识别时间戳并计算持续时间
 - **格式兼容**：支持多种日志格式
+- **异常检测**：检测错误突增、重复错误、趋势变化（新）
+- **错误分类**：自动将错误分类（数据库、网络、内存等）（新）
+- **多文件聚合**：同时分析多个日志文件（新）
 
 ## 📦 安装
 
@@ -131,6 +134,77 @@ log-analyzer watch app.log --level WARN
 log-analyzer watch app.log --interval 500
 ```
 
+### 4. 异常检测
+
+检测日志中的异常情况：
+
+```bash
+log-analyzer detect app.log
+```
+
+自定义检测阈值：
+
+```bash
+log-analyzer detect app.log --error-spike-threshold 10 --error-spike-window 2
+```
+
+导出检测结果：
+
+```bash
+log-analyzer detect app.log --output anomalies.json
+```
+
+检测示例输出：
+
+```
+🔍 异常检测结果
+
+发现 2 个异常:
+
+⚠️  ERROR_SPIKE
+   严重程度: HIGH
+   时间: 2024-02-11 10:10:00
+   描述: 检测到错误突增：1分钟内 7 个错误
+   影响行: 7, 8, 9, 10, 11...
+
+⚠️  REPEATED_ERROR
+   严重程度: HIGH
+   时间: N/A
+   描述: connection timeout to database server
+   影响行: 7, 8, 9, 10, 11...
+
+📂 错误分类:
+
+  DATABASE: 7 个错误
+  MEMORY: 1 个错误
+```
+
+### 5. 多文件聚合
+
+同时分析多个日志文件：
+
+```bash
+log-analyzer aggregate app.log nginx.log system.log
+```
+
+扫描目录中的所有日志文件：
+
+```bash
+log-analyzer aggregate --directory /var/log --exclude node_modules,.git
+```
+
+使用通配符匹配：
+
+```bash
+log-analyzer aggregate --pattern "logs/**/*.log"
+```
+
+导出聚合结果：
+
+```bash
+log-analyzer aggregate app.log nginx.log --output summary.json
+```
+
 ## 📋 支持的日志格式
 
 ### 标准格式
@@ -192,6 +266,44 @@ log-analyzer analyze app.log --patterns "error,timeout,failed"
 
 统计特定模式的出现次数。
 
+### 5. 异常检测
+
+检测系统异常情况：
+
+```bash
+log-analyzer detect app.log
+```
+
+自动检测：
+- 错误突增：1分钟内错误数量超过阈值
+- 重复错误：同一错误重复出现多次
+- 错误分类：自动将错误分类（数据库、网络、内存等）
+
+### 6. 多文件聚合
+
+聚合分析多个服务的日志：
+
+```bash
+log-analyzer aggregate --directory /var/log/app --output report.json
+```
+
+适用于微服务架构、多实例部署的场景。
+
+### 7. DevOps 运维
+
+监控生产环境日志：
+
+```bash
+# 实时监控错误
+log-analyzer watch production.log --level ERROR
+
+# 定期检测异常（配合 cron）
+log-analyzer detect production.log --output anomalies.json
+
+# 聚合分析所有服务日志
+log-analyzer aggregate --directory /var/log --exclude .git
+```
+
 ## 📊 输出说明
 
 ### 日志级别
@@ -220,6 +332,41 @@ log-analyzer analyze app.log --patterns "error,timeout,failed"
 
 ## 💡 高级功能
 
+### 异常检测详解
+
+**1. 错误突增检测**
+
+自动检测短时间内错误数量的突然增加：
+
+```bash
+log-analyzer detect app.log --error-spike-threshold 5 --error-spike-window 1
+```
+
+- `--error-spike-threshold`: 触发阈值（默认：5个错误/分钟）
+- `--error-spike-window`: 时间窗口（默认：1分钟）
+
+**2. 重复错误检测**
+
+检测重复出现的错误：
+
+```bash
+log-analyzer detect app.log --repeat-threshold 3
+```
+
+- `--repeat-threshold`: 重复次数阈值（默认：3次）
+
+**3. 错误自动分类**
+
+自动将错误分类：
+
+- DATABASE: 数据库相关错误
+- NETWORK: 网络和连接错误
+- AUTHENTICATION: 认证和授权错误
+- FILE_SYSTEM: 文件系统错误
+- MEMORY: 内存相关错误
+- VALIDATION: 数据验证错误
+- OTHER: 其他错误
+
 ### 过滤日志级别
 
 ```bash
@@ -244,6 +391,27 @@ log-analyzer analyze app.log --patterns "error,timeout,slow"
 ```
 
 统计多个模式的出现次数。
+
+### 多文件聚合选项
+
+**目录扫描：**
+
+```bash
+log-analyzer aggregate --directory /var/log
+```
+
+**排除特定目录：**
+
+```bash
+log-analyzer aggregate --directory /var/log --exclude node_modules,.git
+```
+
+**通配符匹配：**
+
+```bash
+log-analyzer aggregate --pattern "logs/**/*.log"
+log-analyzer aggregate --pattern "app-*.log"
+```
 
 ## 🔧 配置选项
 
@@ -273,12 +441,33 @@ log-analyzer analyze app.log --patterns "error,timeout,slow"
 | `--interval <ms>` | 检查间隔（毫秒），默认 1000 |
 | `--level <level>` | 最低日志级别（ERROR/WARN/INFO/DEBUG）|
 
+### 异常检测
+
+| 参数 | 说明 |
+|------|------|
+| `<file>` | 日志文件路径 |
+| `--error-spike-threshold <number>` | 错误突增阈值（默认：5）|
+| `--error-spike-window <minutes>` | 时间窗口（分钟，默认：1）|
+| `--repeat-threshold <number>` | 重复错误阈值（默认：3）|
+| `--output <file>` | 导出结果到文件（JSON格式）|
+
+### 聚合分析
+
+| 参数 | 说明 |
+|------|------|
+| `<files...>` | 日志文件路径列表 |
+| `-d, --directory <path>` | 扫描目录中的日志文件 |
+| `-p, --pattern <glob>` | 使用通配符模式匹配文件 |
+| `--exclude <items>` | 排除的目录（逗号分隔）|
+| `-o, --output <file>` | 导出结果到文件（JSON格式）|
+| `-f, --format <type>` | 导出格式（json/csv）|
+
 ## 🚧 待实现
 
 - [ ] 支持更多日志格式
 - [ ] 图形化展示
-- [ ] 日志聚合分析
-- [ ] 告警通知
+- [ ] 告警通知（邮件、Slack、钉钉等）
+- [ ] 日志趋势预测
 
 ## 🤝 贡献
 

@@ -1,7 +1,7 @@
 {
   "name": "@raphaellcs/log-analyzer",
-  "version": "1.0.0",
-  "description": "日志分析工具 - 快速分析日志文件，提取关键信息",
+  "version": "2.0.0",
+  "description": "日志分析工具 - 快速分析日志文件，检测异常，聚合多文件",
   "main": "src/index.js",
   "bin": {
     "log-analyzer": "./bin/cli.js"
