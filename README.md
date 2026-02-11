@@ -1,4 +1,7 @@
 # @claw-dev/log-analyzer
+[![npm](https://img.shields.io/npm/v/@raphaellcs/log-analyzer)](https://www.npmjs.com/package/@raphaellcs/log-analyzer)
+[![downloads](https://img.shields.io/npm/dm/@raphaellcs/log-analyzer)](https://www.npmjs.com/package/@raphaellcs/log-analyzer)
+[![license](https://img.shields.io/npm/l/@raphaellcs/log-analyzer)](https://www.npmjs.com/package/@raphaellcs/log-analyzer)
 
 > 日志分析工具 - 快速分析日志文件，提取关键信息
 
