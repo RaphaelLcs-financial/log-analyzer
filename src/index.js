@@ -20,9 +20,9 @@ function parseLogLine(line) {
   // 尝试匹配常见格式
   const patterns = [
     // 标准格式：[2024-02-11 18:00:00] [INFO] message
-    /^\[?(\d{4}-\d{2}-\d{2}[^]\s]*)[\s\]]+\[?([A-Z]+)[\]\s]+(.+)/,
+    /^\[(\d{4}-\d{2}-\d{2}[^\]]+)\]\s+\[([A-Z]+)\]\s+(.+)/,
     // nginx 格式：2024/02/11 18:00:00 [info] message
-    /^(\d{4}\/\d{2}\/\d{2}[^]\s]*)\s+\[?([a-z]+)[\]\s]+(.+)/i,
+    /^(\d{4}\/\d{2}\/\d{2}[^\s]+)\s+\[([a-z]+)\]\s+(.+)/i,
     // syslog 格式：Feb 11 18:00:00 hostname message
     /^([A-Za-z]{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})\s+(\S+)\s+(.+)/,
     // 简单格式：ERROR: message
@@ -317,41 +317,63 @@ function exportJSON(stats, outputPath) {
 
 // 导出为 CSV
 function exportCSV(stats, outputPath) {
-  const lines = [];
-  
-  // 头部
-  lines.push('Type,Count');
-  
+  const sections = [];
+
   // 级别统计
-  for (const [level, count] of Object.entries(stats.levels)) {
-    lines.push(`Level_${level},${count}`);
+  if (Object.keys(stats.levels).length > 0) {
+    sections.push(['Level', 'Count']);
+    for (const [level, count] of Object.entries(stats.levels)) {
+      sections.push([level, count.toString()]);
+    }
+    sections.push([]);
   }
-  
+
   // 错误
-  lines.push('\nType,Line,Timestamp,Message');
-  for (const error of stats.errors) {
-    const timestamp = error.timestamp || '';
-    const message = `"${error.message.replace(/"/g, '""')}"`;
-    lines.push(`ERROR,${error.line},${timestamp},${message}`);
+  if (stats.errors.length > 0) {
+    sections.push(['Type', 'Line', 'Timestamp', 'Message']);
+    for (const error of stats.errors) {
+      const timestamp = error.timestamp || '';
+      const message = `"${error.message.replace(/"/g, '""')}"`;
+      sections.push(['ERROR', error.line.toString(), timestamp, message]);
+    }
+    sections.push([]);
   }
-  
+
   // 警告
-  for (const warning of stats.warnings) {
-    const timestamp = warning.timestamp || '';
-    const message = `"${warning.message.replace(/"/g, '""')}"`;
-    lines.push(`WARNING,${warning.line},${timestamp},${message}`);
+  if (stats.warnings.length > 0) {
+    sections.push(['Type', 'Line', 'Timestamp', 'Message']);
+    for (const warning of stats.warnings) {
+      const timestamp = warning.timestamp || '';
+      const message = `"${warning.message.replace(/"/g, '""')}"`;
+      sections.push(['WARNING', warning.line.toString(), timestamp, message]);
+    }
+    sections.push([]);
   }
-  
+
   // 模式统计
   if (Object.keys(stats.patterns).length > 0) {
-    lines.push('\nPattern,Count');
+    sections.push(['Pattern', 'Count']);
     for (const [pattern, count] of Object.entries(stats.patterns)) {
-      lines.push(`"${pattern}",${count}`);
+      sections.push([`"${pattern}"`, count.toString()]);
     }
+    sections.push([]);
   }
-  
-  const csv = lines.join('\n');
-  
+
+  // 时间范围
+  if (stats.timeRange) {
+    sections.push(['TimeRange', 'Value']);
+    sections.push(['Start', stats.timeRange.start]);
+    sections.push(['End', stats.timeRange.end]);
+    sections.push(['Duration (ms)', stats.timeRange.duration.toString()]);
+    sections.push([]);
+  }
+
+  // 总行数
+  sections.push(['Metric', 'Value']);
+  sections.push(['TotalLines', stats.totalLines.toString()]);
+
+  const csv = sections.map(section => section.join(',')).join('\n');
+
   if (outputPath) {
     fs.writeFileSync(outputPath, csv, 'utf-8');
     console.log(chalk.green(`✓ 已导出到: ${outputPath}`));
