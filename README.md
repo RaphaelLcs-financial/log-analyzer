@@ -7,6 +7,7 @@
 - **日志分析**：统计日志级别、错误、警告
 - **模式搜索**：快速查找包含特定内容的日志
 - **实时监控**：监控日志文件变化，实时输出
+- **导出结果**：导出为 JSON 或 CSV 格式
 - **时间范围**：自动识别时间戳并计算持续时间
 - **格式兼容**：支持多种日志格式
 
@@ -48,6 +49,53 @@ log-analyzer analyze app.log
   [45] Slow query detected
   [67] Memory usage high
   ...
+```
+
+### 2. 导出分析结果
+
+**导出为 JSON：**
+
+```bash
+log-analyzer analyze app.log --output result.json --format json
+```
+
+**导出为 CSV：**
+
+```bash
+log-analyzer analyze app.log --output result.csv --format csv
+```
+
+JSON 输出示例：
+
+```json
+{
+  "totalLines": 1523,
+  "levels": {
+    "INFO": 1200,
+    "DEBUG": 300,
+    "WARN": 20,
+    "ERROR": 3
+  },
+  "errors": [
+    {
+      "line": 234,
+      "timestamp": "2024-02-11T14:23:45.000Z",
+      "message": "Connection timeout"
+    }
+  ],
+  "warnings": [
+    {
+      "line": 45,
+      "timestamp": "2024-02-11T12:34:56.000Z",
+      "message": "Slow query detected"
+    }
+  ],
+  "timeRange": {
+    "start": "2024-02-11T10:00:00.000Z",
+    "end": "2024-02-11T18:00:00.000Z",
+    "duration": 28800000
+  }
+}
 ```
 
 ### 2. 搜索日志
@@ -203,6 +251,8 @@ log-analyzer analyze app.log --patterns "error,timeout,slow"
 | `<file>` | 日志文件路径 |
 | `--patterns <items>` | 搜索模式（逗号分隔）|
 | `--limit <number>` | 限制显示数量 |
+| `--output <file>` | 导出结果到文件（不指定则输出到控制台）|
+| `--format <type>` | 导出格式：json（默认）或 csv |
 
 ### 搜索
 
@@ -223,7 +273,6 @@ log-analyzer analyze app.log --patterns "error,timeout,slow"
 ## 🚧 待实现
 
 - [ ] 支持更多日志格式
-- [ ] 导出分析结果（JSON/CSV）
 - [ ] 图形化展示
 - [ ] 日志聚合分析
 - [ ] 告警通知

@@ -303,10 +303,85 @@ program
   .description('日志分析工具 - 快速分析日志文件')
   .version('1.0.0');
 
+// 导出为 JSON
+function exportJSON(stats, outputPath) {
+  const data = JSON.stringify(stats, null, 2);
+  
+  if (outputPath) {
+    fs.writeFileSync(outputPath, data, 'utf-8');
+    console.log(chalk.green(`✓ 已导出到: ${outputPath}`));
+  } else {
+    console.log(data);
+  }
+}
+
+// 导出为 CSV
+function exportCSV(stats, outputPath) {
+  const lines = [];
+  
+  // 头部
+  lines.push('Type,Count');
+  
+  // 级别统计
+  for (const [level, count] of Object.entries(stats.levels)) {
+    lines.push(`Level_${level},${count}`);
+  }
+  
+  // 错误
+  lines.push('\nType,Line,Timestamp,Message');
+  for (const error of stats.errors) {
+    const timestamp = error.timestamp || '';
+    const message = `"${error.message.replace(/"/g, '""')}"`;
+    lines.push(`ERROR,${error.line},${timestamp},${message}`);
+  }
+  
+  // 警告
+  for (const warning of stats.warnings) {
+    const timestamp = warning.timestamp || '';
+    const message = `"${warning.message.replace(/"/g, '""')}"`;
+    lines.push(`WARNING,${warning.line},${timestamp},${message}`);
+  }
+  
+  // 模式统计
+  if (Object.keys(stats.patterns).length > 0) {
+    lines.push('\nPattern,Count');
+    for (const [pattern, count] of Object.entries(stats.patterns)) {
+      lines.push(`"${pattern}",${count}`);
+    }
+  }
+  
+  const csv = lines.join('\n');
+  
+  if (outputPath) {
+    fs.writeFileSync(outputPath, csv, 'utf-8');
+    console.log(chalk.green(`✓ 已导出到: ${outputPath}`));
+  } else {
+    console.log(csv);
+  }
+}
+
+// 导出分析结果
+function exportStats(stats, format, outputPath) {
+  switch (format.toLowerCase()) {
+    case 'json':
+      exportJSON(stats, outputPath);
+      break;
+    case 'csv':
+      exportCSV(stats, outputPath);
+      break;
+    default:
+      console.log(chalk.red(`不支持的导出格式: ${format}`));
+      console.log(chalk.gray('支持的格式: json, csv'));
+      process.exit(1);
+  }
+}
+
 program
   .command('analyze <file>')
   .option('-p, --patterns <items>', '搜索模式（逗号分隔）')
   .option('-l, --limit <number>', '限制显示数量', parseInt)
+  .option('-o, --output <file>', '导出结果到文件')
+  .option('-f, --format <type>', '导出格式（json/csv）', 'json')
   .description('分析日志文件')
   .action((file, options) => {
     if (!fs.existsSync(file)) {
@@ -325,7 +400,12 @@ program
       patterns
     });
     
-    printStats(stats, options);
+    // 如果指定了导出，则导出
+    if (options.output) {
+      exportStats(stats, options.format, options.output);
+    } else {
+      printStats(stats, options);
+    }
   });
 
 program
