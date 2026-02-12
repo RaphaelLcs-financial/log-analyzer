@@ -1,9 +1,15 @@
 # @raphaellcs/log-analyzer
-[![npm](https://img.shields.io/npm/v/@raphaellcs/log-analyzer)](https://www.npmjs.com/package/@raphaellcs/log-analyzer)
-[![downloads](https://img.shields.io/npm/dm/@raphaellcs/log-analyzer)](https://www.npmjs.com/package/@raphaellcs/log-analyzer)
-[![license](https://img.shields.io/npm/l/@raphaellcs/log-analyzer)](https://www.npmjs.com/package/@raphaellcs/log-analyzer)
+[![npm](https://img.shields.io/npm/v/@raphaellcs/log-analyzer)](https://www.npmjs.org/package/@raphaellcs/log-analyzer)
+[![downloads](https://img.shields.io/npm/dm/@raphaellcs/log-analyzer)](https://www.npmjs.org/package/@raphaellcs/log-analyzer)
+[![license](https://img.shields.io/npm/l/@raphaellcs/log-analyzer)](https://www.npmjs.org/package/@raphaellcs/log-analyzer)
+[![GitHub stars](https://img.shields.io/github/stars/RaphaelLcs-financial/log-analyzer?style=social)](https://github.com/RaphaelLcs-financial/log-analyzer/stargazers)
+[![GitHub issues](https://img.shields.io/github/issues/RaphaelLcs-financial/log-analyzer)](https://github.com/RaphaelLcs-financial/log-analyzer/issues)
 
-> 日志分析工具 - 快速分析日志文件，提取关键信息
+> 日志分析工具 - 快速分析日志文件，检测异常，聚合多文件分析
+
+## ⭐ 索助
+
+如果这个工具对你有帮助，请给个 Star ⭐️ 或者考虑 [赞助我](https://github.com/sponsors/RaphaelLcs-financial)！
 
 ## 🚀 功能
 
