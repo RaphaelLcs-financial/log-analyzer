@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { program } = require('commander');
 const chalk = require('chalk');
+const { archiveLogFiles, archiveDirectory, showArchiveStats } = require('./archive');
 const moment = require('moment');
 const { LOG_LEVELS, parseLogLine, getLevelWeight, analyzeLogs } = require('./analyzer.js');
 const { detectAnomalies } = require('./anomaly-detection.js');
@@ -12,10 +13,10 @@ const { aggregateLogs, scanLogFiles, globFiles } = require('./aggregator.js');
 // 打印统计结果
 function printStats(stats, options) {
   console.log(chalk.cyan('\n📊 日志统计\n'));
-  
+
   // 总行数
   console.log(chalk.gray(`总行数: ${stats.totalLines}`));
-  
+
   // 时间范围
   if (stats.timeRange) {
     const durationMs = stats.timeRange.duration;
@@ -23,9 +24,9 @@ function printStats(stats, options) {
     console.log(chalk.gray(`时间范围: ${stats.timeRange.start} ~ ${stats.timeRange.end}`));
     console.log(chalk.gray(`持续时间: ${duration.humanize()}`));
   }
-  
+
   console.log();
-  
+
   // 级别统计
   if (Object.keys(stats.levels).length > 0) {
     console.log(chalk.cyan('日志级别:'));
@@ -36,7 +37,7 @@ function printStats(stats, options) {
     }
     console.log();
   }
-  
+
   // 错误
   if (stats.errors.length > 0) {
     console.log(chalk.red(`❌ 错误 (${stats.errors.length}):`));
@@ -49,7 +50,7 @@ function printStats(stats, options) {
     }
     console.log();
   }
-  
+
   // 警告
   if (stats.warnings.length > 0) {
     console.log(chalk.yellow(`⚠️  警告 (${stats.warnings.length}):`));
@@ -62,7 +63,7 @@ function printStats(stats, options) {
     }
     console.log();
   }
-  
+
   // 模式匹配
   if (Object.keys(stats.patterns).length > 0) {
     console.log(chalk.cyan('🔍 模式匹配:'));
@@ -77,7 +78,7 @@ function printStats(stats, options) {
 function searchLogs(content, query, options) {
   const lines = content.split('\n');
   const results = [];
-  
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     if (line.toLowerCase().includes(query.toLowerCase())) {
@@ -90,28 +91,28 @@ function searchLogs(content, query, options) {
       });
     }
   }
-  
+
   return results;
 }
 
 // 打印搜索结果
 function printSearchResults(results, options) {
   console.log(chalk.cyan(`\n🔍 搜索结果: "${query}" (${results.length} 条)\n`));
-  
+
   const displayResults = options.limit ? results.slice(0, options.limit) : results;
-  
+
   for (const result of displayResults) {
     const levelColor = LOG_LEVELS[result.level]?.color || 'gray';
-    console.log(chalk.gray(`[${result.lineNumber}]`), 
+    console.log(chalk.gray(`[${result.lineNumber}]`),
                 chalk.gray(result.timestamp || '-'),
                 result.level ? chalk[levelColor](result.level) : '',
                 result.message);
   }
-  
+
   if (options.limit && results.length > options.limit) {
     console.log(chalk.gray(`\n... 还有 ${results.length - options.limit} 条结果`));
   }
-  
+
   console.log();
 }
 
@@ -121,120 +122,82 @@ function watchLog(filePath, options) {
     console.log(chalk.red(`文件不存在: ${filePath}`));
     process.exit(1);
   }
-  
+
   const fs = require('fs');
   let fileSize = fs.statSync(filePath).size;
-  
-  console.log(chalk.cyan(`\n👀 监控日志: ${filePath}`));
+
+  console.log(chalk.cyan(`\n👀 监控日志: ${filePath}\n`));
   console.log(chalk.gray('按 Ctrl+C 停止\n'));
-  
+
   const checkInterval = setInterval(() => {
     try {
       const currentSize = fs.statSync(filePath).size;
-      
+
       if (currentSize > fileSize) {
         const stream = fs.createReadStream(filePath, {
           start: fileSize,
           encoding: 'utf8'
         });
-        
+
+        let buffer = '';
         stream.on('data', (chunk) => {
-          const lines = chunk.toString().split('\n');
+          buffer += chunk;
+
+          const lines = buffer.split('\n');
           for (const line of lines) {
             if (!line.trim()) continue;
-            
+
             const parsed = parseLogLine(line);
-            
+
             // 过滤级别
-            if (options.level) {
-              const weight = getLevelWeight(parsed.level);
-              const minWeight = getLevelWeight(options.level);
-              if (weight < minWeight) continue;
+            if (options.level && parsed.level) {
+              const levelWeight = getLevelWeight(parsed.level);
+              const minWeight = options.level.map(l => getLevelWeight(l)).reduce((a, b) => Math.min(a, b), Infinity);
+              
+              if (levelWeight < minWeight) {
+                continue;
+              }
             }
-            
-            // 打印
+
             const levelColor = LOG_LEVELS[parsed.level]?.color || 'gray';
-            console.log(chalk.gray(parsed.timestamp || '-'), 
-                       parsed.level ? chalk[levelColor](parsed.level) : '',
-                       parsed.message);
+            console.log(chalk.gray(`[${parsed.lineNumber}]`),
+                        chalk.gray(parsed.timestamp || '-'),
+                        parsed.level ? chalk[levelColor](parsed.level) : '',
+                        parsed.message);
           }
         });
-        
+
         fileSize = currentSize;
       }
-    } catch (e) {
-      console.error(chalk.red(`监控错误: ${e.message}`));
+    } catch (error) {
+      console.error(error);
     }
-  }, options.interval || 1000);
-  
+  }, options.interval || 5000);
+
+  // 清理
   process.on('SIGINT', () => {
     clearInterval(checkInterval);
-    console.log(chalk.gray('\n\n停止监控'));
+    console.log(chalk.gray('\n监控已停止'));
     process.exit(0);
   });
 }
 
-// CLI 配置
-program
-  .name('log-analyzer')
-  .description('日志分析工具 - 快速分析日志文件')
-  .version('1.0.0');
-
-// 导出为 JSON
-function exportJSON(stats, outputPath) {
-  const data = JSON.stringify(stats, null, 2);
-  
-  if (outputPath) {
-    fs.writeFileSync(outputPath, data, 'utf-8');
-    console.log(chalk.green(`✓ 已导出到: ${outputPath}`));
-  } else {
-    console.log(data);
-  }
-}
-
-// 导出为 CSV
-function exportCSV(stats, outputPath) {
+// 导出统计结果为 CSV
+function exportStatsCSV(stats, outputPath) {
   const sections = [];
 
   // 级别统计
-  if (Object.keys(stats.levels).length > 0) {
-    sections.push(['Level', 'Count']);
-    for (const [level, count] of Object.entries(stats.levels)) {
-      sections.push([level, count.toString()]);
-    }
-    sections.push([]);
-  }
+  sections.push(['Metric', 'Value']);
+  sections.push(['TotalFiles', stats.files.length.toString()]);
+  sections.push(['TotalLines', stats.totalLines.toString()]);
+  sections.push(['TotalSize (KB)', (stats.totalSize / 1024).toFixed(2)]);
+  sections.push([]);
 
-  // 错误
-  if (stats.errors.length > 0) {
-    sections.push(['Type', 'Line', 'Timestamp', 'Message']);
-    for (const error of stats.errors) {
-      const timestamp = error.timestamp || '';
-      const message = `"${error.message.replace(/"/g, '""')}"`;
-      sections.push(['ERROR', error.line.toString(), timestamp, message]);
-    }
-    sections.push([]);
+  sections.push(['Level', 'Count']);
+  for (const [level, count] of Object.entries(stats.levels)) {
+    sections.push([level, count.toString()]);
   }
-
-  // 警告
-  if (stats.warnings.length > 0) {
-    sections.push(['Type', 'Line', 'Timestamp', 'Message']);
-    for (const warning of stats.warnings) {
-      const timestamp = warning.timestamp || '';
-      const message = `"${warning.message.replace(/"/g, '""')}"`;
-      sections.push(['WARNING', warning.line.toString(), timestamp, message]);
-    }
-    sections.push([]);
-  }
-
-  // 模式统计
-  if (Object.keys(stats.patterns).length > 0) {
-    sections.push(['Pattern', 'Count']);
-    for (const [pattern, count] of Object.entries(stats.patterns)) {
-      sections.push([`"${pattern}"`, count.toString()]);
-    }
-    sections.push([]);
-  }
+  sections.push([]);
 
   // 时间范围
   if (stats.timeRange) {
@@ -244,10 +207,6 @@ function exportCSV(stats, outputPath) {
     sections.push(['Duration (ms)', stats.timeRange.duration.toString()]);
     sections.push([]);
   }
-
-  // 总行数
-  sections.push(['Metric', 'Value']);
-  sections.push(['TotalLines', stats.totalLines.toString()]);
 
   const csv = sections.map(section => section.join(',')).join('\n');
 
@@ -259,14 +218,24 @@ function exportCSV(stats, outputPath) {
   }
 }
 
+// 导出分析结果为 CSV
+function exportStatsJSON(stats, outputPath) {
+  if (outputPath) {
+    fs.writeFileSync(outputPath, JSON.stringify(stats, null, 2), 'utf-8');
+    console.log(chalk.green(`✓ 已导出到: ${outputPath}`));
+  } else {
+    console.log(JSON.stringify(stats, null, 2));
+  }
+}
+
 // 导出分析结果
 function exportStats(stats, format, outputPath) {
   switch (format.toLowerCase()) {
     case 'json':
-      exportJSON(stats, outputPath);
+      exportStatsJSON(stats, outputPath);
       break;
     case 'csv':
-      exportCSV(stats, outputPath);
+      exportStatsCSV(stats, outputPath);
       break;
     default:
       console.log(chalk.red(`不支持的导出格式: ${format}`));
@@ -274,6 +243,11 @@ function exportStats(stats, format, outputPath) {
       process.exit(1);
   }
 }
+
+program
+  .name('log-analyzer')
+  .description('日志分析工具 - 快速分析日志文件，提取关键信息')
+  .version('2.0.0');
 
 program
   .command('analyze <file>')
@@ -287,19 +261,18 @@ program
       console.log(chalk.red(`文件不存在: ${file}`));
       process.exit(1);
     }
-    
+
     const content = fs.readFileSync(file, 'utf-8');
-    
+
     let patterns = [];
     if (options.patterns) {
       patterns = options.patterns.split(',');
     }
-    
+
     const stats = analyzeLogs(content, {
       patterns
     });
-    
-    // 如果指定了导出，则导出
+
     if (options.output) {
       exportStats(stats, options.format, options.output);
     } else {
@@ -316,7 +289,7 @@ program
       console.log(chalk.red(`文件不存在: ${file}`));
       process.exit(1);
     }
-    
+
     const content = fs.readFileSync(file, 'utf-8');
     const results = searchLogs(content, query, options);
     printSearchResults(results, options);
@@ -331,12 +304,12 @@ program
     watchLog(file, options);
   });
 
-// 异常检测命令
 program
   .command('detect <file>')
   .option('--error-spike-threshold <number>', '错误突增阈值（错误数量/分钟）', parseInt)
   .option('--error-spike-window <minutes>', '时间窗口（分钟）', parseInt)
   .option('--repeat-threshold <number>', '重复错误次数阈值', parseInt)
+  .option('--trend-window <ms>', '趋势分析时间窗口（毫秒）', parseInt)
   .option('--output <file>', '导出结果到文件（JSON格式）')
   .description('检测日志异常')
   .action((file, options) => {
@@ -346,84 +319,35 @@ program
     }
 
     const content = fs.readFileSync(file, 'utf-8');
-    const patterns = [];
 
-    const stats = analyzeLogs(content, { patterns });
-
-    // 检测异常
-    const anomalyOptions = {
+    const anomalies = detectAnomalies(content, {
       errorSpikeThreshold: options.errorSpikeThreshold || 5,
-      errorSpikeWindowMinutes: options.errorSpikeWindow || 1,
-      repeatThreshold: options.repeatThreshold || 3
-    };
+      errorSpikeWindow: (options.errorSpikeWindow || 5) * 60 * 1000,
+      repeatThreshold: options.repeatThreshold || 3,
+      trendWindow: options.trendWindow || 300 * 1000
+    });
 
-    const result = detectAnomalies(stats, anomalyOptions);
-
-    // 打印结果
     console.log(chalk.cyan('\n🔍 异常检测结果\n'));
+    console.log(chalk.gray(`总异常数: ${anomalies.length}\n`));
 
-    // 异常列表
-    if (result.anomalies.length > 0) {
-      console.log(chalk.yellow(`发现 ${result.anomalies.length} 个异常:\n`));
+    for (const anomaly of anomalies) {
+      const typeColor = anomaly.type === 'ERROR_SPIKE' ? 'red' :
+                       anomaly.type === 'REPEATED_ERROR' ? 'yellow' :
+                       anomaly.type === 'TREND_CHANGE' ? 'blue' : 'gray';
 
-      for (const anomaly of result.anomalies) {
-        const severityColor = anomaly.severity === 'HIGH' ? 'red' : 'yellow';
-        console.log(chalk[severityColor](`⚠️  ${anomaly.type}`));
-        console.log(chalk.gray(`   严重程度: ${anomaly.severity}`));
-        console.log(chalk.gray(`   时间: ${anomaly.timestamp || 'N/A'}`));
-        console.log(chalk.gray(`   描述: ${anomaly.message}`));
-
-        if (anomaly.affectedLines) {
-          console.log(chalk.gray(`   影响行: ${anomaly.affectedLines.slice(0, 5).join(', ')}${anomaly.affectedLines.length > 5 ? '...' : ''}`));
-        }
-
-        console.log();
-      }
-    } else {
-      console.log(chalk.green('✓ 未发现异常\n'));
-    }
-
-    // 趋势分析
-    if (result.trends.length > 0) {
-      console.log(chalk.cyan('📈 趋势分析:\n'));
-
-      for (const trend of result.trends) {
-        const directionColor = trend.direction === 'INCREASING' ? 'red' : 'green';
-        console.log(chalk[directionColor](`  ${trend.message}`));
-      }
-
+      console.log(chalk[typeColor](`[${anomaly.type}]`));
+      console.log(chalk.gray(`  描述: ${anomaly.description}`));
+      console.log(chalk.gray(`  位置: 第 ${anomaly.lineNumber} 行`));
+      console.log(chalk.gray(`  时间: ${anomaly.timestamp}`));
       console.log();
     }
 
-    // 错误分类
-    if (result.classification) {
-      console.log(chalk.cyan('📂 错误分类:\n'));
-
-      for (const [category, data] of Object.entries(result.classification)) {
-        if (data.errors.length > 0) {
-          console.log(chalk.yellow(`  ${category}: ${data.errors.length} 个错误`));
-        }
-      }
-
-      console.log();
-    }
-
-    // 导出结果
     if (options.output) {
-      const outputData = {
-        file: file,
-        stats: stats,
-        anomalies: result.anomalies,
-        trends: result.trends,
-        classification: result.classification
-      };
-
-      fs.writeFileSync(options.output, JSON.stringify(outputData, null, 2), 'utf-8');
-      console.log(chalk.green(`✓ 已导出到: ${options.output}`));
+      fs.writeFileSync(options.output, JSON.stringify(anomalies, null, 2), 'utf-8');
+      console.log(chalk.green(`✓ 异常结果已导出到: ${options.output}`));
     }
   });
 
-// 聚合分析命令
 program
   .command('aggregate <files...>')
   .option('-d, --directory <path>', '扫描目录中的日志文件')
@@ -540,6 +464,72 @@ program
       }
       console.log(chalk.green(`✓ 已导出到: ${outputPath}`));
     }
+  });
+
+// 归档日志命令
+program
+  .command('archive <file>')
+  .option('-d, --archive-dir <path>', '归档目录', './archive')
+  .option('--compress', '压缩归档文件（使用 gzip）', false)
+  .option('--delete-after <days>', '归档 X 天后的文件', 0)
+  .option('--dry-run', '预览模式（不真正归档）', false)
+  .description('归档日志文件')
+  .action((file, options) => {
+    if (!fs.existsSync(file)) {
+      console.log(chalk.red(`文件不存在: ${file}`));
+      process.exit(1);
+    }
+
+    console.log(chalk.cyan(`\n📦 归档日志: ${file}\n`));
+
+    archiveLogFiles([file], {
+      archiveDir: options.archiveDir,
+      compress: options.compress,
+      deleteAfter: options.deleteAfter,
+      dryRun: options.dryRun
+    });
+
+    console.log();
+  });
+
+// 归档目录命令
+program
+  .command('archive-dir <dir>')
+  .option('-d, --archive-dir <path>', '归档目录', './archive')
+  .option('--compress', '压缩归档文件（使用 gzip）', false)
+  .option('--delete-after <days>', '归档 X 天后的文件', 0)
+  .option('--dry-run', '预览模式（不真正归档）', false)
+  .description('归档目录中的所有日志文件')
+  .action((dir, options) => {
+    if (!fs.existsSync(dir)) {
+      console.log(chalk.red(`目录不存在: ${dir}`));
+      process.exit(1);
+    }
+
+    console.log(chalk.cyan(`\n📂 归档目录: ${dir}\n`));
+
+    archiveDirectory(dir, {
+      archiveDir: options.archiveDir,
+      compress: options.compress,
+      deleteAfter: options.deleteAfter,
+      dryRun: options.dryRun
+    });
+
+    console.log();
+  });
+
+// 归档统计命令
+program
+  .command('archive-stats')
+  .option('-d, --archive-dir <path>', '归档目录', './archive')
+  .description('显示归档统计')
+  .action((options) => {
+    const archiveDir = options.archiveDir;
+
+    console.log(chalk.cyan(`\n📊 归档统计\n`));
+    console.log(chalk.gray(`归档目录: ${archiveDir}\n`));
+
+    showArchiveStats(archiveDir);
   });
 
 program.parse();
