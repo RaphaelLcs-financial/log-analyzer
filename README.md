@@ -1,5 +1,10 @@
 # log-analyzer
 
+[![npm version](https://badge.fury.io/js/@raphaellcs%2Flog-analyzer.svg)](https://badge.fury.io/js/@raphaellcs%2Flog-analyzer)
+[![npm downloads](https://img.shields.io/npm/dm/@raphaellcs/log-analyzer.svg)](https://www.npmjs.com/package/@raphaellcs/log-analyzer)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![GitHub stars](https://img.shields.io/github/stars/RaphaelLcs-financial/log-analyzer.svg?style=social)](https://github.com/RaphaelLcs-financial/log-analyzer)
+
 日志分析工具 - 快速分析日志文件，提取关键信息
 
 ## 功能
@@ -87,6 +92,76 @@ log-analyzer archive-dir /var/log/myapp --compress
 # 显示归档统计
 log-analyzer archive-stats --archive-dir ./archive
 ```
+
+
+## 可视化功能
+
+**可视化命令**：charts
+
+**核心功能**：
+- **日志趋势图**（折线图）- 显示日志级别随时间的变化
+- **日志级别分布图**（饼图）- 显示各级别的占比
+- **错误类型分布图**（柱状图）- 显示各错误类型的数量
+- **生成交互式 HTML 报告** - 包含所有图表和详细统计
+
+**使用示例**：
+
+```bash
+# 生成图表（使用日志统计）
+log-analyzer charts app.log
+
+# 指定输出目录
+log-analyzer charts app.log -o ./reports
+
+# 指定输出格式
+log-analyzer charts app.log -f html
+```
+
+**输出内容**：
+- `log-trend.html` - 日志趋势图
+- `log-levels.html` - 日志级别分布图
+- `error-types.html` - 错误类型分布图
+- `log-analysis-report.html` - 交互式报告
+
+**图表功能**：
+- 📊 **日志趋势图**
+  - 显示 INFO、DEBUG、WARN、ERROR 数量随时间的变化
+  - 支持 SVG 图形渲染
+  - 响应式设计
+
+- 📊 **日志级别分布图**
+  - 显示各级别的占比
+  - 饼图可视化
+  - 点击显示详情
+
+- 📊 **错误类型分布图**
+  - 显示数据库、网络、内存、文件系统等错误类型的数量
+  - 柱状图可视化
+  - 支持多维度分类
+
+- 📊 **交互式报告**
+  - 汇总所有统计数据
+  - 链接到所有图表
+  - 快速导航和过滤
+
+**技术特性**：
+- 使用纯 JavaScript 生成 SVG 图形
+- 使用 HTML/CSS 生成美观的报告
+- 支持导出到本地文件
+- 支持多种图表类型
+
+**应用场景**：
+- **开发环境**：实时查看日志趋势，快速发现问题
+- **生产环境**：定期生成报告，监控系统健康状况
+- **问题诊断**：通过可视化快速定位问题
+- **团队协作**：共享可视化报告，便于团队讨论
+
+**示例输出**：
+- 总日志数
+- 各级别数量和占比
+- 错误类型分布
+- 趋势图表
+- 交互式报告
 
 ## 适用场景
 
